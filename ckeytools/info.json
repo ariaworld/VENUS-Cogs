@@ -6,6 +6,7 @@
     "install_msg": "Thanks to oranges for making both the tgdb/tgverify cogs. Reminder that this cog is made to work alongside these two, so in order to use it you must have both installed and set up",
     "short": "plugins for tgdb/tgverify",
     "requirements": [
+        "git+https://github.com/optimumtact/orangescogs.git#egg=tgcommon&subdirectory=tgcommon",
         "aiomysql",
         "tomlkit"
     ],
