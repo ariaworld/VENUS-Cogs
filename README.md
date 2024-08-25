@@ -1,3 +1,3 @@
-# Mal0-cogs
+# VENUS-cogs
 
-Redbot Cogs for S.P.LU.R.T. Station 13
+Redbot Cogs for VENUS Station 13
