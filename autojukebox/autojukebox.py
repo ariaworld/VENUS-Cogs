@@ -13,6 +13,9 @@ from redbot.core.utils import antispam
 from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
 
+APPROVE_EMOJI = '✅'  # Checkmark
+REJECT_EMOJI = '❌'  # Cross
+
 class AutoJukebox(commands.Cog):
     """
     Lets player suggest songs to automatically add to the jukebox in-game
@@ -171,7 +174,7 @@ class AutoJukebox(commands.Cog):
         
         await self.config.custom("JUKEBOX_SUGGESTION", ctx.guild.id, suggestion).finished.set(True)
         await self.config.custom("JUKEBOX_SUGGESTION", ctx.guild.id, suggestion).approved.set(True)
-        await oldmsg.add_reaction('👍')
+        await oldmsg.add_reaction(APPROVE_EMOJI)
     
     @commands.group(invoke_without_command=True, name="jukeapprove")
     @commands.guild_only()
@@ -236,7 +239,7 @@ class AutoJukebox(commands.Cog):
         await self.config.custom("JUKEBOX_SUGGESTION", ctx.guild.id, suggestion).finished.set(True)
         await self.config.custom("JUKEBOX_SUGGESTION", ctx.guild.id, suggestion).approved.set(True)
         await ctx.tick()
-        await oldmsg.add_reaction('👎')
+        await oldmsg.add_reaction(REJECT_EMOJI)
         
     @commands.group(invoke_without_command=True, name="jukereject")
     @commands.guild_only()
