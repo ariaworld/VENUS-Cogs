@@ -11,6 +11,7 @@ import discord
 from redbot.core import commands, Config, checks
 from redbot.core.utils import antispam
 from redbot.core.bot import Red
+from redbot.core.data_manager import cog_data_path
 
 class AutoJukebox(commands.Cog):
     """
@@ -95,7 +96,8 @@ class AutoJukebox(commands.Cog):
             return await ctx.message.reply(f"Your file is too thicc! the max filesize is {round(max_song_size / 1024**2, 2)}mb.")
         
         async with ctx.typing():
-            path_name = os.path.abspath(os.path.join(os.getcwd(), attachment.filename))
+            temp_dir = cog_data_path(self)
+            path_name = os.path.join(temp_dir, attachment.filename)
             await attachment.save(path_name)
             
             ogg_audio = AudioSegment.from_ogg(path_name)
