@@ -137,7 +137,7 @@ class SChangelog(commands.Cog):
     async def _download_cl_from_repo(self, ctx: commands.Context, day: datetime):
         gitlink = await self.config.guild(ctx.guild).gitlink()
         rawlink = gitlink.replace("github.com", "raw.githubusercontent.com")
-        rawlink += "/master/html/changelogs/archive/{yearmonth}.yml".format(yearmonth=day.strftime("%Y-%m"))
+        rawlink += "/main/html/changelogs/archive/{yearmonth}.yml".format(yearmonth=day.strftime("%Y-%m"))
         archivedir = os.path.join(os.getcwd(), "temp/Repository/html/changelogs/archive")
         filedir = os.path.join(archivedir, day.strftime("%Y-%m") + ".yml")
         os.makedirs(archivedir, exist_ok=True)
