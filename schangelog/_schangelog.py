@@ -133,7 +133,7 @@ class SChangelog(commands.Cog):
             embed.add_field(name=author, value=chat_formatting.box(cont.strip(), "yaml"), inline=False)
         
         await channel.send(message, embed=embed, allowed_mentions=discord.AllowedMentions(everyone=True, users=True, roles=True, replied_user=True))
-    #test
+
     async def _download_cl_from_repo(self, ctx: commands.Context, day: datetime):
         gitlink = await self.config.guild(ctx.guild).gitlink()
         rawlink = gitlink.replace("github.com", "raw.githubusercontent.com")
