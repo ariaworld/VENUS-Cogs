@@ -20,18 +20,94 @@ class BadgeButton(discord.ui.Button):
         
         # For clear button
         if self.tier == 0:
-            await self.cog.badge_clear(ctx)
+            # Check if the system is enabled
+            if not await self.cog.config.guild(ctx.guild).enabled():
+                await interaction.response.send_message("The badge selection system is not enabled on this server.", ephemeral=True)
+                return
+
+            # Get badge roles
+            badge_roles = await self.cog.config.guild(ctx.guild).badge_roles()
+            
+            # Check if roles are configured
+            if not all(badge_roles.values()):
+                await interaction.response.send_message("The badge system has not been fully configured. Please contact an administrator.", ephemeral=True)
+                return
+            
+            # Remove any existing badge roles
+            badge_role_ids = [int(badge_id) for badge_id in badge_roles.values() if badge_id]
+            roles_to_remove = [role for role in ctx.author.roles if role.id in badge_role_ids]
+            
+            if not roles_to_remove:
+                await interaction.response.send_message("You don't have any donator badges to remove.", ephemeral=True)
+                return
+            
+            await ctx.author.remove_roles(*roles_to_remove, reason="Badge cleared")
             await interaction.response.send_message("✅ Your donator badge has been removed.", ephemeral=True)
             return
             
         # For list button
         if self.tier == -1:
-            await interaction.response.defer(ephemeral=True, thinking=True)
-            await self.cog.badge_list(ctx)
+            await interaction.response.defer(ephemeral=True)
+            
+            # Check if the system is enabled
+            if not await self.cog.config.guild(ctx.guild).enabled():
+                await interaction.followup.send("The badge selection system is not enabled on this server.", ephemeral=True)
+                return
+                
+            # Get tier and badge roles
+            tier_roles = await self.cog.config.guild(ctx.guild).tier_roles()
+            badge_roles = await self.cog.config.guild(ctx.guild).badge_roles()
+            
+            # Check if roles are configured
+            if not all(tier_roles.values()) or not all(badge_roles.values()):
+                await interaction.followup.send("The badge system has not been fully configured. Please contact an administrator.", ephemeral=True)
+                return
+            
+            # Get the member's highest tier role
+            highest_tier = 0
+            for t in range(5, 0, -1):
+                role_id = tier_roles[str(t)]
+                role = ctx.guild.get_role(role_id)
+                if role and role in ctx.author.roles:
+                    highest_tier = t
+                    break
+            
+            if highest_tier == 0:
+                await interaction.followup.send("You don't have any donator tier roles. Please contact an administrator if you believe this is an error.", ephemeral=True)
+                return
+            
+            # Create a list of available badges
+            available_badges = []
+            for t in range(1, highest_tier + 1):
+                badge_id = badge_roles[str(t)]
+                badge_role = ctx.guild.get_role(badge_id)
+                if badge_role:
+                    available_badges.append(f"Tier {t}: {badge_role.name}")
+            
+            # Find currently selected badge
+            badge_role_ids = [int(badge_id) for badge_id in badge_roles.values() if badge_id]
+            current_badge = None
+            for role in ctx.author.roles:
+                if role.id in badge_role_ids:
+                    for t, badge_id in badge_roles.items():
+                        if badge_id == role.id:
+                            current_badge = f"Tier {t}"
+            
+            # Create and send embed
+            embed = discord.Embed(
+                title="Available Donator Badges",
+                description=f"Based on your **Tier {highest_tier} Donator** status, you can select from the following badges:",
+                color=discord.Color.gold()
+            )
+            
+            embed.add_field(name="Currently Selected", value=current_badge or "None", inline=False)
+            embed.add_field(name="Available Badges", value="\n".join(available_badges), inline=False)
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
             return
             
         # For badge selection buttons
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await interaction.response.defer(ephemeral=True)
         
         # Check if the system is enabled
         if not await self.cog.config.guild(ctx.guild).enabled():
