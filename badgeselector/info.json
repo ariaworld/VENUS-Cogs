@@ -1,0 +1,16 @@
+{
+    "author": [
+        "Goku"
+    ],
+    "description": "A cog to allow users to select badges based on their donator tier",
+    "install_msg": "Thank you for installing BadgeSelector! Use `[p]setbadge` to setup the badge selection system.",
+    "short": "Donator Badge Selection System",
+    "Name": "BadgeSelector",
+    "tags": [
+        "Utility",
+        "Roles",
+        "Badge",
+        "Donator"
+    ],
+    "min_bot_version": "3.5.0"
+} 
