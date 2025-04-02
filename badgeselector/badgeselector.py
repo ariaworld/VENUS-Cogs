@@ -8,7 +8,9 @@ import asyncio
 
 class BadgeButton(discord.ui.Button):
     def __init__(self, cog, tier: int, style: discord.ButtonStyle, label: str, emoji: str = None, disabled: bool = False):
-        super().__init__(style=style, label=label, emoji=emoji, disabled=disabled)
+        # Add a custom_id for each button based on tier
+        custom_id = f"badge_button_{tier}"
+        super().__init__(style=style, label=label, emoji=emoji, disabled=disabled, custom_id=custom_id)
         self.cog = cog
         self.tier = tier
     
@@ -137,16 +139,9 @@ class BadgeSelector(commands.Cog):
         self.persistent_views_added = False
     
     async def cog_load(self):
-        await self.register_badge_views()
-    
-    async def register_badge_views(self):
-        if self.persistent_views_added:
-            return
-        
-        # Add our persistent view for button interactions
         self.bot.add_view(BadgeView(self))
         self.persistent_views_added = True
-    
+
     @commands.group(name="badge")
     @commands.guild_only()
     async def badge(self, ctx: commands.Context):
@@ -429,7 +424,7 @@ class BadgeSelector(commands.Cog):
         embed.add_field(
             name="How It Works",
             value=(
-                "• You can select badges up to your highest donator tier\n"
+                "• You can only select badges up to your highest donator tier\n"
                 "• You can only have one badge at a time\n"
                 "• Click 'Clear Badge' to remove your current badge\n"
                 "• Click 'List Available' to see which badges you can choose"
