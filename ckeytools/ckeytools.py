@@ -424,8 +424,7 @@ class CkeyTools(commands.Cog):
         """
         Configure logging for verified & age-vetted users leaving.
         """
-        if ctx.invoked_subcommand is None:
-            await ctx.send_help(ctx.command)
+        pass
     
     @leave_log_config.command(name="verified")
     async def set_verified_role(self, ctx: commands.Context, role: discord.Role):
