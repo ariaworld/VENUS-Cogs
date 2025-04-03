@@ -23,8 +23,8 @@ class CkeyTools(commands.Cog):
     Extension cog for TGDB/TGVerify
     """
     
-    __author__ = "Mosley"
-    __version__ = "2.0.1"
+    __author__ = "Goku"
+    __version__ = "2.0.2"
     
     def __init__(self, bot):
         self.bot = bot
@@ -34,7 +34,11 @@ class CkeyTools(commands.Cog):
             "forcestay_enabled": "off",
             "autodonator_enabled": "off",
             "config_folder": None,
-            "donator_roles": []
+            "donator_roles": [],
+            "verified_role_id": None,
+            "age_vetted_role_id": None,
+            "leave_log_channel_id": None,
+            "leave_log_enabled": False
         }
         
         default_role = {
@@ -50,15 +54,45 @@ class CkeyTools(commands.Cog):
         guild = member.guild
         if guild is None:
             return
+        
         enabled = await self.config.guild(guild).forcestay_enabled()
         prefix = await self.get_tgdb_prefix(guild)
 
-        if not (enabled == "on"):
-            return
+        if enabled == "on":
+            query = f"UPDATE {prefix}discord_links SET valid = FALSE WHERE discord_id = %s AND valid = TRUE"
+            parameters = [member.id]
+            results = await self.query_database(query, parameters)
         
-        query = f"UPDATE {prefix}discord_links SET valid = FALSE WHERE discord_id = %s AND valid = TRUE"
-        parameters = [member.id]
-        results = await self.query_database(query, parameters)
+        leave_log_enabled = await self.config.guild(guild).leave_log_enabled()
+        if not leave_log_enabled:
+            return
+            
+        verified_role_id = await self.config.guild(guild).verified_role_id()
+        age_vetted_role_id = await self.config.guild(guild).age_vetted_role_id()
+        log_channel_id = await self.config.guild(guild).leave_log_channel_id()
+        
+        if not (verified_role_id and age_vetted_role_id and log_channel_id):
+            return
+            
+        member_role_ids = [role.id for role in member.roles]
+        
+        if verified_role_id in member_role_ids and age_vetted_role_id in member_role_ids:
+            log_channel = guild.get_channel(log_channel_id)
+            if log_channel and isinstance(log_channel, discord.TextChannel):
+                try:
+                    embed = discord.Embed(
+                        title="Verified & Age-Vetted User Left",
+                        description=f"{member.mention} ({member}) has left the server.",
+                        color=discord.Color.orange(),
+                        timestamp=discord.utils.utcnow()
+                    )
+                    embed.set_thumbnail(url=member.display_avatar.url)
+                    embed.add_field(name="User ID", value=str(member.id), inline=False)
+                    
+                    await log_channel.send(embed=embed)
+                    log.info(f"Logged verified+age-vetted user leave: {member.id} in guild {guild.id}")
+                except Exception as e:
+                    log.error(f"Failed to send leave log message: {e}", exc_info=True)
     
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member) -> None:
@@ -382,3 +416,128 @@ class CkeyTools(commands.Cog):
             return DiscordLink.from_db_record(results[0])
 
         return None
+
+    # New commands for leave logging
+    @ckeytools.group(name="leavelog")
+    @checks.is_owner()
+    async def leave_log_config(self, ctx: commands.Context):
+        """
+        Configure logging for verified & age-vetted users leaving.
+        """
+        if ctx.invoked_subcommand is None:
+            await ctx.send_help(ctx.command)
+    
+    @leave_log_config.command(name="verified")
+    async def set_verified_role(self, ctx: commands.Context, role: discord.Role):
+        """Sets the role that is considered 'Verified' for leave logging."""
+        await self.config.guild(ctx.guild).verified_role_id.set(role.id)
+        await ctx.send(f"Leave logging will track the '{role.name}' role as the verified role.")
+    
+    @leave_log_config.command(name="agevetted")
+    async def set_age_vetted_role(self, ctx: commands.Context, role: discord.Role):
+        """Sets the role that is considered 'Age-Vetted' for leave logging."""
+        await self.config.guild(ctx.guild).age_vetted_role_id.set(role.id)
+        await ctx.send(f"Leave logging will track the '{role.name}' role as the age-vetted role.")
+    
+    @leave_log_config.command(name="channel")
+    async def set_leave_log_channel(self, ctx: commands.Context, channel: discord.TextChannel):
+        """Sets the channel where leave logs will be sent."""
+        await self.config.guild(ctx.guild).leave_log_channel_id.set(channel.id)
+        await ctx.send(f"Leave logs will now be sent to {channel.mention}.")
+    
+    @leave_log_config.command(name="toggle")
+    async def toggle_leave_log(self, ctx: commands.Context, enable: bool):
+        """Enables or disables leave logging."""
+        await self.config.guild(ctx.guild).leave_log_enabled.set(enable)
+        status = "enabled" if enable else "disabled"
+        await ctx.send(f"Leave logging is now {status}.")
+    
+    @leave_log_config.command(name="status")
+    async def show_leave_log_status(self, ctx: commands.Context):
+        """Shows the current leave logging configuration."""
+        settings = {}
+        settings["enabled"] = await self.config.guild(ctx.guild).leave_log_enabled()
+        settings["verified_role_id"] = await self.config.guild(ctx.guild).verified_role_id()
+        settings["age_vetted_role_id"] = await self.config.guild(ctx.guild).age_vetted_role_id()
+        settings["log_channel_id"] = await self.config.guild(ctx.guild).leave_log_channel_id()
+        
+        verified_role = ctx.guild.get_role(settings["verified_role_id"]) if settings["verified_role_id"] else None
+        age_vetted_role = ctx.guild.get_role(settings["age_vetted_role_id"]) if settings["age_vetted_role_id"] else None
+        log_channel = ctx.guild.get_channel(settings["log_channel_id"]) if settings["log_channel_id"] else None
+        
+        embed = discord.Embed(
+            title="Leave Logging Configuration",
+            color=await ctx.embed_color(),
+            timestamp=discord.utils.utcnow()
+        )
+        embed.add_field(name="Enabled", value=str(settings["enabled"]), inline=False)
+        embed.add_field(
+            name="Verified Role", 
+            value=f"{verified_role.mention} ({verified_role.id})" if verified_role else "Not set", 
+            inline=False
+        )
+        embed.add_field(
+            name="Age-Vetted Role", 
+            value=f"{age_vetted_role.mention} ({age_vetted_role.id})" if age_vetted_role else "Not set", 
+            inline=False
+        )
+        embed.add_field(
+            name="Log Channel", 
+            value=f"{log_channel.mention} ({log_channel.id})" if log_channel else "Not set", 
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+        
+    @leave_log_config.command(name="simulate")
+    async def simulate_leave_log(self, ctx: commands.Context, member: discord.Member = None):
+        """
+        Simulates a leave log message for testing purposes.
+        
+        If no member is specified, uses the command invoker as the test subject.
+        """
+        # Use the command invoker if no member specified
+        if member is None:
+            member = ctx.author
+            
+        # Check if feature is properly configured
+        verified_role_id = await self.config.guild(ctx.guild).verified_role_id()
+        age_vetted_role_id = await self.config.guild(ctx.guild).age_vetted_role_id()
+        log_channel_id = await self.config.guild(ctx.guild).leave_log_channel_id()
+        
+        if not all([verified_role_id, age_vetted_role_id, log_channel_id]):
+            missing = []
+            if not verified_role_id:
+                missing.append("Verified role")
+            if not age_vetted_role_id:
+                missing.append("Age-vetted role")
+            if not log_channel_id:
+                missing.append("Log channel")
+            
+            missing_str = ", ".join(missing)
+            return await ctx.send(f"⚠️ Cannot simulate: {missing_str} not configured. Use `{ctx.prefix}ckeytools leavelog status` to check your configuration.")
+        
+        # Get the log channel
+        log_channel = ctx.guild.get_channel(log_channel_id)
+        if not log_channel or not isinstance(log_channel, discord.TextChannel):
+            return await ctx.send(f"⚠️ Cannot simulate: Log channel not found or is not a text channel.")
+        
+        # Create the embed exactly as it would appear when a user leaves
+        try:
+            embed = discord.Embed(
+                title="Verified & Age-Vetted User Left",
+                description=f"{member.mention} ({member}) has left the server.",
+                color=discord.Color.orange(),
+                timestamp=discord.utils.utcnow()
+            )
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.add_field(name="User ID", value=str(member.id), inline=False)
+            embed.set_footer(text="This is a simulation - the user has not actually left")
+            
+            # Send the embed to the log channel
+            await log_channel.send(embed=embed)
+            await ctx.send(f"✅ Simulation completed. Check {log_channel.mention} to view the test message.")
+            
+        except Exception as e:
+            await ctx.send(f"❌ Error during simulation: {str(e)}")
+            log.error(f"Error in leave log simulation: {e}", exc_info=True)
