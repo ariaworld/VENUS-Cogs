@@ -496,6 +496,7 @@ class CkeyTools(commands.Cog):
         
         If no member is specified, uses the command invoker as the test subject.
         """
+        # This is a test function to simulate the leave log embed
         # Use the command invoker if no member specified
         if member is None:
             member = ctx.author
