@@ -80,10 +80,6 @@ class CkeyTools(commands.Cog):
             log_channel = guild.get_channel(log_channel_id)
             if log_channel and isinstance(log_channel, discord.TextChannel):
                 try:
-                    # Calculate account age
-                    account_created = member.created_at
-                    account_age = (discord.utils.utcnow() - account_created).days
-                    
                     # Calculate time on server if join date is available
                     joined_at = member.joined_at
                     time_on_server = ""
@@ -128,13 +124,10 @@ class CkeyTools(commands.Cog):
                     if member.nick and member.nick != member.name:
                         embed.add_field(name="Server Nickname", value=member.nick, inline=True)
                     
-                    # Add verification information
-                    embed.add_field(name="Account Created", value=f"<t:{int(account_created.timestamp())}:F> ({account_age} days ago)", inline=False)
-                    
+                    # Add join date information
                     if time_on_server:
-                        embed.add_field(name="Joined Server", value=f"<t:{int(joined_at.timestamp())}:F> ({time_on_server} ago)", inline=False)
+                        embed.add_field(name="Joined Server", value=f"<t:{int(joined_at.timestamp())}:F> (Was on server for {time_on_server})", inline=False)
                     
-                    # Add appropriate footer based on ban status
                     if is_banned:
                         embed.set_footer(text="User was banned. Review ban reason before considering re-age-vetting.")
                     else:
@@ -575,10 +568,6 @@ class CkeyTools(commands.Cog):
         
         # Create the embed exactly as it would appear when a user leaves
         try:
-            # Calculate account age
-            account_created = member.created_at
-            account_age = (discord.utils.utcnow() - account_created).days
-            
             # Calculate time on server if join date is available
             joined_at = member.joined_at
             time_on_server = ""
@@ -602,11 +591,9 @@ class CkeyTools(commands.Cog):
             if member.nick and member.nick != member.name:
                 embed.add_field(name="Server Nickname", value=member.nick, inline=True)
             
-            # Add verification information
-            embed.add_field(name="Account Created", value=f"<t:{int(account_created.timestamp())}:F> ({account_age} days ago)", inline=False)
-            
+            # Add join date information
             if time_on_server:
-                embed.add_field(name="Joined Server", value=f"<t:{int(joined_at.timestamp())}:F> ({time_on_server} ago)", inline=False)
+                embed.add_field(name="Joined Server", value=f"<t:{int(joined_at.timestamp())}:F> (Was on server for {time_on_server})", inline=False)
             
             # Add simulation notice and vetting guidance
             embed.set_footer(text="This is a simulation - the user has not actually left | Use this as proof for re-age-vetting if they rejoin.")
@@ -655,10 +642,6 @@ class CkeyTools(commands.Cog):
         
         # Create the embed for a ban
         try:
-            # Calculate account age
-            account_created = member.created_at
-            account_age = (discord.utils.utcnow() - account_created).days
-            
             # Calculate time on server if join date is available
             joined_at = member.joined_at
             time_on_server = ""
@@ -682,11 +665,9 @@ class CkeyTools(commands.Cog):
             if member.nick and member.nick != member.name:
                 embed.add_field(name="Server Nickname", value=member.nick, inline=True)
             
-            # Add verification information
-            embed.add_field(name="Account Created", value=f"<t:{int(account_created.timestamp())}:F> ({account_age} days ago)", inline=False)
-            
+            # Add join date information
             if time_on_server:
-                embed.add_field(name="Joined Server", value=f"<t:{int(joined_at.timestamp())}:F> ({time_on_server} ago)", inline=False)
+                embed.add_field(name="Joined Server", value=f"<t:{int(joined_at.timestamp())}:F> (Was on server for {time_on_server})", inline=False)
             
             # Add simulation notice
             embed.set_footer(text="This is a simulation - the user has not actually been banned | Review ban reason before considering re-age-vetting.")
