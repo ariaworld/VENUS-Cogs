@@ -80,41 +80,14 @@ class CkeyTools(commands.Cog):
             log_channel = guild.get_channel(log_channel_id)
             if log_channel and isinstance(log_channel, discord.TextChannel):
                 try:
-                    # Calculate account age
-                    account_created = member.created_at
-                    account_age = (discord.utils.utcnow() - account_created).days
-                    
-                    # Calculate time on server if join date is available
-                    joined_at = member.joined_at
-                    time_on_server = ""
-                    if joined_at:
-                        days_on_server = (discord.utils.utcnow() - joined_at).days
-                        time_on_server = f"{days_on_server} days"
-                    
                     embed = discord.Embed(
                         title="Verified & Age-Vetted User Left",
                         description=f"{member.mention} ({member}) has left the server.",
                         color=discord.Color.orange(),
                         timestamp=discord.utils.utcnow()
                     )
-                    
-                    # More detailed user information
                     embed.set_thumbnail(url=member.display_avatar.url)
-                    embed.add_field(name="User ID", value=str(member.id), inline=True)
-                    embed.add_field(name="Full User Tag", value=f"{member.name}#{member.discriminator}" if hasattr(member, "discriminator") and member.discriminator != "0" else member.name, inline=True)
-                    
-                    # Add server-specific information
-                    if member.nick and member.nick != member.name:
-                        embed.add_field(name="Server Nickname", value=member.nick, inline=True)
-                    
-                    # Add verification information
-                    embed.add_field(name="Account Created", value=f"<t:{int(account_created.timestamp())}:F> ({account_age} days ago)", inline=False)
-                    
-                    if time_on_server:
-                        embed.add_field(name="Joined Server", value=f"<t:{int(joined_at.timestamp())}:F> ({time_on_server} ago)", inline=False)
-                    
-                    # Add note for re-verification
-                    embed.set_footer(text=f"This user had been verified and age-vetted. Archive this for re-vetting evidence if they rejoin.")
+                    embed.add_field(name="User ID", value=str(member.id), inline=False)
                     
                     await log_channel.send(embed=embed)
                     log.info(f"Logged verified+age-vetted user leave: {member.id} in guild {guild.id}")
@@ -551,41 +524,15 @@ class CkeyTools(commands.Cog):
         
         # Create the embed exactly as it would appear when a user leaves
         try:
-            # Calculate account age
-            account_created = member.created_at
-            account_age = (discord.utils.utcnow() - account_created).days
-            
-            # Calculate time on server if join date is available
-            joined_at = member.joined_at
-            time_on_server = ""
-            if joined_at:
-                days_on_server = (discord.utils.utcnow() - joined_at).days
-                time_on_server = f"{days_on_server} days"
-            
             embed = discord.Embed(
                 title="Verified & Age-Vetted User Left",
                 description=f"{member.mention} ({member}) has left the server.",
                 color=discord.Color.orange(),
                 timestamp=discord.utils.utcnow()
             )
-            
-            # More detailed user information
             embed.set_thumbnail(url=member.display_avatar.url)
-            embed.add_field(name="User ID", value=str(member.id), inline=True)
-            embed.add_field(name="Full User Tag", value=f"{member.name}#{member.discriminator}" if hasattr(member, "discriminator") and member.discriminator != "0" else member.name, inline=True)
-            
-            # Add server-specific information
-            if member.nick and member.nick != member.name:
-                embed.add_field(name="Server Nickname", value=member.nick, inline=True)
-            
-            # Add verification information
-            embed.add_field(name="Account Created", value=f"<t:{int(account_created.timestamp())}:F> ({account_age} days ago)", inline=False)
-            
-            if time_on_server:
-                embed.add_field(name="Joined Server", value=f"<t:{int(joined_at.timestamp())}:F> ({time_on_server} ago)", inline=False)
-            
-            # Add simulation notice and vetting guidance
-            embed.set_footer(text="This is a simulation - the user has not actually left | Archive for re-vetting evidence if they rejoin.")
+            embed.add_field(name="User ID", value=str(member.id), inline=False)
+            embed.set_footer(text="This is a simulation - the user has not actually left")
             
             # Send the embed to the log channel
             await log_channel.send(embed=embed)
