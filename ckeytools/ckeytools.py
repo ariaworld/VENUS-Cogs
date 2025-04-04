@@ -80,8 +80,6 @@ class CkeyTools(commands.Cog):
             log_channel = guild.get_channel(log_channel_id)
             if log_channel and isinstance(log_channel, discord.TextChannel):
                 try:
-                    account_created = member.created_at
-                    
                     embed = discord.Embed(
                         title="Verified & Age-Vetted User Left",
                         description=f"{member.mention} ({member}) has left the server.",
@@ -90,13 +88,6 @@ class CkeyTools(commands.Cog):
                     )
                     embed.set_thumbnail(url=member.display_avatar.url)
                     embed.add_field(name="User ID", value=str(member.id), inline=False)
-                    
-                    embed.add_field(name="Account Created", value=f"<t:{int(account_created.timestamp())}:F>", inline=False)
-                    
-                    if member.joined_at:
-                        embed.add_field(name="Joined Server", value=f"<t:{int(member.joined_at.timestamp())}:F>", inline=False)
-                    
-                    embed.set_footer(text="Use this as proof for re-agevetting if user rejoins.")
                     
                     await log_channel.send(embed=embed)
                     log.info(f"Logged verified+age-vetted user leave: {member.id} in guild {guild.id}")
@@ -533,26 +524,15 @@ class CkeyTools(commands.Cog):
         
         # Create the embed exactly as it would appear when a user leaves
         try:
-            account_created = member.created_at
-            
             embed = discord.Embed(
                 title="Verified & Age-Vetted User Left",
                 description=f"{member.mention} ({member}) has left the server.",
                 color=discord.Color.orange(),
                 timestamp=discord.utils.utcnow()
             )
-            
             embed.set_thumbnail(url=member.display_avatar.url)
-            
             embed.add_field(name="User ID", value=str(member.id), inline=False)
-            
-            embed.add_field(name="Account Created", value=f"<t:{int(account_created.timestamp())}:F>", inline=False)
-            
-            if member.joined_at:
-                embed.add_field(name="Joined Server", value=f"<t:{int(member.joined_at.timestamp())}:F>", inline=False)
-            
-            # Add simulation notice
-            embed.set_footer(text="This is a simulation - the user has not actually left | Use this as proof for re-agevetting if user rejoins.")
+            embed.set_footer(text="This is a simulation - the user has not actually left")
             
             # Send the embed to the log channel
             await log_channel.send(embed=embed)
