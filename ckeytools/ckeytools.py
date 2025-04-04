@@ -91,12 +91,55 @@ class CkeyTools(commands.Cog):
                         days_on_server = (discord.utils.utcnow() - joined_at).days
                         time_on_server = f"{days_on_server} days"
                     
-                    embed = discord.Embed(
-                        title="Verified & Age-Vetted User Left",
-                        description=f"{member.mention} ({member}) has left the server.",
-                        color=discord.Color.orange(),
-                        timestamp=discord.utils.utcnow()
-                    )
+                    # Check if the user was banned
+                    try:
+                        # This will raise discord.NotFound if the user wasn't banned
+                        ban_entry = await guild.fetch_ban(member)
+                        is_banned = True
+                        is_kicked = False
+                    except discord.NotFound:
+                        is_banned = False
+                        
+                        # Check if the user was kicked using audit logs
+                        is_kicked = False
+                        try:
+                            # Need the appropriate permission to view audit logs
+                            if guild.me.guild_permissions.view_audit_log:
+                                # Look for a recent kick entry for this user
+                                async for entry in guild.audit_logs(action=discord.AuditLogAction.kick, limit=10):
+                                    if entry.target.id == member.id and (discord.utils.utcnow() - entry.created_at).total_seconds() < 300:  # within last 5 minutes
+                                        is_kicked = True
+                                        break
+                        except Exception as e:
+                            log.error(f"Error checking kick status: {e}", exc_info=True)
+                    except Exception as e:
+                        # If we can't determine ban status for some reason, assume not banned or kicked
+                        log.error(f"Error checking ban/kick status: {e}", exc_info=True)
+                        is_banned = False
+                        is_kicked = False
+                    
+                    # Create appropriate embed based on whether user was banned, kicked, or left
+                    if is_banned:
+                        embed = discord.Embed(
+                            title="Verified & Age-Vetted User Banned",
+                            description=f"{member.mention} ({member}) has been banned from the server.",
+                            color=discord.Color.red(),
+                            timestamp=discord.utils.utcnow()
+                        )
+                    elif is_kicked:
+                        embed = discord.Embed(
+                            title="Verified & Age-Vetted User Kicked",
+                            description=f"{member.mention} ({member}) has been kicked from the server.",
+                            color=discord.Color.gold(),  # Using gold/yellow for kicks
+                            timestamp=discord.utils.utcnow()
+                        )
+                    else:
+                        embed = discord.Embed(
+                            title="Verified & Age-Vetted User Left",
+                            description=f"{member.mention} ({member}) has left the server.",
+                            color=discord.Color.orange(),
+                            timestamp=discord.utils.utcnow()
+                        )
                     
                     # More detailed user information
                     embed.set_thumbnail(url=member.display_avatar.url)
@@ -113,11 +156,16 @@ class CkeyTools(commands.Cog):
                     if time_on_server:
                         embed.add_field(name="Joined Server", value=f"<t:{int(joined_at.timestamp())}:F> ({time_on_server} ago)", inline=False)
                     
-                    # Add note for re-verification
-                    embed.set_footer(text=f"This user had been verified and age-vetted. Archive this for re-vetting evidence if they rejoin.")
+                    # Add appropriate footer based on ban/kick status
+                    if is_banned:
+                        embed.set_footer(text="User was banned. Review ban reason before considering re-age-vetting.")
+                    elif is_kicked:
+                        embed.set_footer(text="User was kicked. Review kick reason before considering re-age-vetting.")
+                    else:
+                        embed.set_footer(text="This user had been verified and age-vetted. Use this as proof for re-age-vetting if they rejoin.")
                     
                     await log_channel.send(embed=embed)
-                    log.info(f"Logged verified+age-vetted user leave: {member.id} in guild {guild.id}")
+                    log.info(f"Logged verified+age-vetted user {'ban' if is_banned else 'leave'}: {member.id} in guild {guild.id}")
                 except Exception as e:
                     log.error(f"Failed to send leave log message: {e}", exc_info=True)
     
@@ -585,7 +633,7 @@ class CkeyTools(commands.Cog):
                 embed.add_field(name="Joined Server", value=f"<t:{int(joined_at.timestamp())}:F> ({time_on_server} ago)", inline=False)
             
             # Add simulation notice and vetting guidance
-            embed.set_footer(text="This is a simulation - the user has not actually left | Archive for re-vetting evidence if they rejoin.")
+            embed.set_footer(text="This is a simulation - the user has not actually left | Use this as proof for re-age-vetting if they rejoin.")
             
             # Send the embed to the log channel
             await log_channel.send(embed=embed)
@@ -594,3 +642,163 @@ class CkeyTools(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Error during simulation: {str(e)}")
             log.error(f"Error in leave log simulation: {e}", exc_info=True)
+
+    @leave_log_config.command(name="simulateban")
+    async def simulate_ban_log(self, ctx: commands.Context, member: discord.Member = None):
+        """
+        Simulates a ban log message for testing purposes.
+        
+        Parameters:
+        - member: The member to simulate as banned (defaults to yourself)
+        """
+        # Use the command invoker if no member specified
+        if member is None:
+            member = ctx.author
+            
+        # Check if feature is properly configured
+        verified_role_id = await self.config.guild(ctx.guild).verified_role_id()
+        age_vetted_role_id = await self.config.guild(ctx.guild).age_vetted_role_id()
+        log_channel_id = await self.config.guild(ctx.guild).leave_log_channel_id()
+        
+        if not all([verified_role_id, age_vetted_role_id, log_channel_id]):
+            missing = []
+            if not verified_role_id:
+                missing.append("Verified role")
+            if not age_vetted_role_id:
+                missing.append("Age-vetted role")
+            if not log_channel_id:
+                missing.append("Log channel")
+            
+            missing_str = ", ".join(missing)
+            return await ctx.send(f"⚠️ Cannot simulate: {missing_str} not configured. Use `{ctx.prefix}ckeytools leavelog status` to check your configuration.")
+        
+        # Get the log channel
+        log_channel = ctx.guild.get_channel(log_channel_id)
+        if not log_channel or not isinstance(log_channel, discord.TextChannel):
+            return await ctx.send(f"⚠️ Cannot simulate: Log channel not found or is not a text channel.")
+        
+        # Create the embed for a ban
+        try:
+            # Calculate account age
+            account_created = member.created_at
+            account_age = (discord.utils.utcnow() - account_created).days
+            
+            # Calculate time on server if join date is available
+            joined_at = member.joined_at
+            time_on_server = ""
+            if joined_at:
+                days_on_server = (discord.utils.utcnow() - joined_at).days
+                time_on_server = f"{days_on_server} days"
+            
+            embed = discord.Embed(
+                title="Verified & Age-Vetted User Banned",
+                description=f"{member.mention} ({member}) has been banned from the server.",
+                color=discord.Color.red(),
+                timestamp=discord.utils.utcnow()
+            )
+            
+            # More detailed user information
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.add_field(name="User ID", value=str(member.id), inline=True)
+            embed.add_field(name="Full User Tag", value=f"{member.name}#{member.discriminator}" if hasattr(member, "discriminator") and member.discriminator != "0" else member.name, inline=True)
+            
+            # Add server-specific information
+            if member.nick and member.nick != member.name:
+                embed.add_field(name="Server Nickname", value=member.nick, inline=True)
+            
+            # Add verification information
+            embed.add_field(name="Account Created", value=f"<t:{int(account_created.timestamp())}:F> ({account_age} days ago)", inline=False)
+            
+            if time_on_server:
+                embed.add_field(name="Joined Server", value=f"<t:{int(joined_at.timestamp())}:F> ({time_on_server} ago)", inline=False)
+            
+            # Add simulation notice
+            embed.set_footer(text="This is a simulation - the user has not actually been banned | User was banned. Review ban reason before considering re-age-vetting.")
+            
+            # Send the embed to the log channel
+            await log_channel.send(embed=embed)
+            await ctx.send(f"✅ Ban simulation completed. Check {log_channel.mention} to view the test message.")
+            
+        except Exception as e:
+            await ctx.send(f"❌ Error during ban simulation: {str(e)}")
+            log.error(f"Error in ban log simulation: {e}", exc_info=True)
+
+    @leave_log_config.command(name="simulatekick")
+    async def simulate_kick_log(self, ctx: commands.Context, member: discord.Member = None):
+        """
+        Simulates a kick log message for testing purposes.
+        
+        Parameters:
+        - member: The member to simulate as kicked (defaults to yourself)
+        """
+        # Use the command invoker if no member specified
+        if member is None:
+            member = ctx.author
+            
+        # Check if feature is properly configured
+        verified_role_id = await self.config.guild(ctx.guild).verified_role_id()
+        age_vetted_role_id = await self.config.guild(ctx.guild).age_vetted_role_id()
+        log_channel_id = await self.config.guild(ctx.guild).leave_log_channel_id()
+        
+        if not all([verified_role_id, age_vetted_role_id, log_channel_id]):
+            missing = []
+            if not verified_role_id:
+                missing.append("Verified role")
+            if not age_vetted_role_id:
+                missing.append("Age-vetted role")
+            if not log_channel_id:
+                missing.append("Log channel")
+            
+            missing_str = ", ".join(missing)
+            return await ctx.send(f"⚠️ Cannot simulate: {missing_str} not configured. Use `{ctx.prefix}ckeytools leavelog status` to check your configuration.")
+        
+        # Get the log channel
+        log_channel = ctx.guild.get_channel(log_channel_id)
+        if not log_channel or not isinstance(log_channel, discord.TextChannel):
+            return await ctx.send(f"⚠️ Cannot simulate: Log channel not found or is not a text channel.")
+        
+        # Create the embed for a kick
+        try:
+            # Calculate account age
+            account_created = member.created_at
+            account_age = (discord.utils.utcnow() - account_created).days
+            
+            # Calculate time on server if join date is available
+            joined_at = member.joined_at
+            time_on_server = ""
+            if joined_at:
+                days_on_server = (discord.utils.utcnow() - joined_at).days
+                time_on_server = f"{days_on_server} days"
+            
+            embed = discord.Embed(
+                title="Verified & Age-Vetted User Kicked",
+                description=f"{member.mention} ({member}) has been kicked from the server.",
+                color=discord.Color.gold(),  # Using gold/yellow for kicks
+                timestamp=discord.utils.utcnow()
+            )
+            
+            # More detailed user information
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.add_field(name="User ID", value=str(member.id), inline=True)
+            embed.add_field(name="Full User Tag", value=f"{member.name}#{member.discriminator}" if hasattr(member, "discriminator") and member.discriminator != "0" else member.name, inline=True)
+            
+            # Add server-specific information
+            if member.nick and member.nick != member.name:
+                embed.add_field(name="Server Nickname", value=member.nick, inline=True)
+            
+            # Add verification information
+            embed.add_field(name="Account Created", value=f"<t:{int(account_created.timestamp())}:F> ({account_age} days ago)", inline=False)
+            
+            if time_on_server:
+                embed.add_field(name="Joined Server", value=f"<t:{int(joined_at.timestamp())}:F> ({time_on_server} ago)", inline=False)
+            
+            # Add simulation notice
+            embed.set_footer(text="This is a simulation - the user has not actually been kicked | Use this as proof for re-age-vetting if they rejoin.")
+            
+            # Send the embed to the log channel
+            await log_channel.send(embed=embed)
+            await ctx.send(f"✅ Kick simulation completed. Check {log_channel.mention} to view the test message.")
+            
+        except Exception as e:
+            await ctx.send(f"❌ Error during kick simulation: {str(e)}")
+            log.error(f"Error in kick log simulation: {e}", exc_info=True)
