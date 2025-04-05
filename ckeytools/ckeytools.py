@@ -4,6 +4,7 @@ from unicodedata import name
 from array import array
 from tokenize import String
 from typing import Optional
+import asyncio
 
 #discord imports
 import discord
@@ -203,6 +204,88 @@ class CkeyTools(commands.Cog):
                     await tgdb.clear_all_valid_discord_links_for_discord_id(ctx, result.discord_id)
         
         return await ctx.send(f"**{deleted}** users have been deverified.")
+
+    @ckeytools.command(name="ckeychange")
+    @checks.is_owner()
+    async def change_ckey(self, ctx: commands.Context, old_ckey: str, new_ckey: str):
+        """
+        Change a ckey in the database from one value to another.
+        
+        This will update all records of the old ckey to the new ckey in the discord_links table.
+        Useful for correcting typos or handling name changes without manual database edits.
+        
+        Parameters:
+        - old_ckey: The current ckey in the database
+        - new_ckey: The new ckey to replace it with
+        """
+        # Sanitize inputs - convert to lowercase
+        old_ckey = old_ckey.lower()
+        new_ckey = new_ckey.lower()
+        
+        # Get the database prefix
+        prefix = await self.get_tgdb_prefix(ctx.guild)
+        
+        # Let the user know we're processing
+        async with ctx.typing():
+            try:
+                # First, check if the old ckey exists
+                check_query = f"SELECT COUNT(*) as count FROM {prefix}discord_links WHERE ckey = %s"
+                check_params = [old_ckey]
+                check_result = await self.query_database(check_query, check_params)
+                
+                # If no records found
+                if not check_result or check_result[0]["count"] == 0:
+                    return await ctx.send(f"❌ No records found for ckey `{old_ckey}`.")
+                
+                # Check if new ckey already exists
+                new_check_query = f"SELECT COUNT(*) as count FROM {prefix}discord_links WHERE ckey = %s"
+                new_check_params = [new_ckey]
+                new_check_result = await self.query_database(new_check_query, new_check_params)
+                
+                # Always show confirmation
+                confirmation_text = f"Found ckey `{old_ckey}` with {check_result[0]['count']} record(s). Change to `{new_ckey}`?"
+                
+                # If new ckey already exists, add warning to confirmation
+                if new_check_result and new_check_result[0]["count"] > 0:
+                    confirmation_text = (
+                        f"⚠️ Warning: Found ckey `{old_ckey}` with {check_result[0]['count']} record(s).\n"
+                        f"The target ckey `{new_ckey}` already exists in the database with "
+                        f"{new_check_result[0]['count']} record(s).\n"
+                        f"Are you sure you want to continue?"
+                    )
+                
+                # Show confirmation message
+                confirmation = await ctx.send(
+                    f"{confirmation_text}\n"
+                    f"React with ✅ to confirm or ❌ to cancel."
+                )
+                
+                # Add reactions for confirmation
+                await confirmation.add_reaction("✅")
+                await confirmation.add_reaction("❌")
+                
+                # Wait for user confirmation
+                def check(reaction, user):
+                    return user == ctx.author and str(reaction.emoji) in ["✅", "❌"] and reaction.message.id == confirmation.id
+                
+                try:
+                    reaction, user = await self.bot.wait_for("reaction_add", timeout=60.0, check=check)
+                    if str(reaction.emoji) == "❌":
+                        return await ctx.send("Operation cancelled.")
+                except asyncio.TimeoutError:
+                    return await ctx.send("Operation timed out - no changes were made.")
+                
+                # Update the ckey
+                update_query = f"UPDATE {prefix}discord_links SET ckey = %s WHERE ckey = %s"
+                update_params = [new_ckey, old_ckey]
+                await self.query_database(update_query, update_params)
+                
+                # Confirmation message
+                return await ctx.send(f"✅ Successfully updated all instances of `{old_ckey}` to `{new_ckey}` in the database.")
+                
+            except Exception as e:
+                log.error(f"Error changing ckey: {e}", exc_info=True)
+                return await ctx.send(f"❌ An error occurred while updating the ckey: {str(e)}")
 
     #autodonator Commands
     @commands.group()
