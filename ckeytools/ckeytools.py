@@ -30,8 +30,6 @@ class CkeyTools(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.config: Config = Config.get_conf(self, identifier=908039527271104513, force_registration=True)
-        # Keep a cache of recent bans to improve detection when another bot does the banning
-        self.recent_bans = {}
 
         default_guild = {
             "forcestay_enabled": "off",
@@ -90,26 +88,17 @@ class CkeyTools(commands.Cog):
                         days_on_server = (discord.utils.utcnow() - joined_at).days
                         time_on_server = f"{days_on_server} days"
                     
-                    # Check if the user was banned - first check our recent bans cache
-                    is_banned = False
-                    
-                    # If we have cached ban info for this guild and this user is in it
-                    if guild.id in self.recent_bans and member.id in self.recent_bans[guild.id]:
+                    # Check if the user was banned
+                    try:
+                        # This will raise discord.NotFound if the user wasn't banned
+                        ban_entry = await guild.fetch_ban(member)
                         is_banned = True
-                        # Clean up after ourselves to prevent memory bloat
-                        del self.recent_bans[guild.id][member.id]
-                    else:
-                        # Fallback to the API check if not found in our cache
-                        try:
-                            # This will raise discord.NotFound if the user wasn't banned
-                            await guild.fetch_ban(member)
-                            is_banned = True
-                        except discord.NotFound:
-                            is_banned = False
-                        except Exception as e:
-                            # If we can't determine ban status for some reason, assume not banned
-                            log.error(f"Error checking ban status via fetch_ban for {member} in {guild}: {e}", exc_info=True)
-                            is_banned = False # Assume not banned if error occurs
+                    except discord.NotFound:
+                        is_banned = False
+                    except Exception as e:
+                        # If we can't determine ban status for some reason, assume not banned
+                        log.error(f"Error checking ban status: {e}", exc_info=True)
+                        is_banned = False
                     
                     # Create appropriate embed based on whether user was banned or left
                     if is_banned:
@@ -156,33 +145,6 @@ class CkeyTools(commands.Cog):
         if not (enabled == "on"):
             return
         await self.rebuild_donator_file(after.guild)
-
-    @commands.Cog.listener()
-    async def on_member_ban(self, guild: discord.Guild, user: discord.User):
-        """Keep track of recent bans for more reliable ban detection"""
-        if guild.id not in self.recent_bans:
-            self.recent_bans[guild.id] = {}
-            
-        # Store the ban with a timestamp - we'll keep bans for 60 seconds
-        self.recent_bans[guild.id][user.id] = discord.utils.utcnow()
-        
-        # Clean old entries to prevent memory bloat
-        self._clean_old_bans(guild.id)
-        
-    def _clean_old_bans(self, guild_id: int):
-        """Remove ban entries older than 60 seconds"""
-        if guild_id not in self.recent_bans:
-            return
-            
-        current_time = discord.utils.utcnow()
-        to_remove = []
-        
-        for user_id, timestamp in self.recent_bans[guild_id].items():
-            if (current_time - timestamp).total_seconds() > 60:
-                to_remove.append(user_id)
-                
-        for user_id in to_remove:
-            del self.recent_bans[guild_id][user_id]
 
     #ckeytools Commands
     @commands.group()
