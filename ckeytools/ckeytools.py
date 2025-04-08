@@ -88,17 +88,27 @@ class CkeyTools(commands.Cog):
                         days_on_server = (discord.utils.utcnow() - joined_at).days
                         time_on_server = f"{days_on_server} days"
                     
-                    # Check if the user was banned
+                    # Check if the user was banned by looking at recent audit logs
+                    is_banned = False
                     try:
-                        # This will raise discord.NotFound if the user wasn't banned
-                        ban_entry = await guild.fetch_ban(member)
-                        is_banned = True
-                    except discord.NotFound:
-                        is_banned = False
+                        # Assumes bot has 'View Audit Log' permission now
+                        async for entry in guild.audit_logs(action=discord.AuditLogAction.ban, limit=10):
+                            # Check if the target matches and the action is recent (e.g., within 10 seconds)
+                            if entry.target.id == member.id and (discord.utils.utcnow() - entry.created_at).total_seconds() < 10:
+                                is_banned = True
+                                break # Found the ban, no need to look further
+                    except discord.Forbidden:
+                        # Log an error if we somehow still lack permissions
+                        log.error(f"Missing 'View Audit Log' permission in guild {guild.id} to detect bans reliably.")
+                        # As a last resort, try fetch_ban, though it might be unreliable for external bots
+                        try:
+                            await guild.fetch_ban(member)
+                            is_banned = True
+                        except discord.NotFound:
+                            is_banned = False 
                     except Exception as e:
-                        # If we can't determine ban status for some reason, assume not banned
-                        log.error(f"Error checking ban status: {e}", exc_info=True)
-                        is_banned = False
+                        log.error(f"Error checking audit log for ban status for {member} in {guild}: {e}", exc_info=True)
+                        is_banned = False # Assume not banned if any other error occurs
                     
                     # Create appropriate embed based on whether user was banned or left
                     if is_banned:
