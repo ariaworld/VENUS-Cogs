@@ -104,6 +104,3 @@ class Say(commands.Cog):
             await ctx.author.send("❌ I don't have permission to send messages in that channel.")
         except discord.HTTPException as e:
             await ctx.author.send(f"❌ Failed to send message: {str(e)}")
-
-async def setup(bot):
-    await bot.add_cog(Say(bot)) 
