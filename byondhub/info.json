@@ -1,0 +1,9 @@
+{
+    "author": ["Goku"],
+    "name": "ByondHub",
+    "short": "Monitor BYOND Hub status",
+    "description": "Monitors BYOND Hub status and sends notifications when it goes up/down with configurable roles and heartbeat messages.",
+    "tags": ["monitoring", "byond", "status", "alerts"],
+    "requirements": ["aiohttp"],
+    "min_bot_version": "3.4.0"
+} 
