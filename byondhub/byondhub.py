@@ -352,3 +352,4 @@ class ByondHub(commands.Cog):
         embed.set_footer(text="Manual Status Check")
         
         await msg.edit(embed=embed) 
+# test
