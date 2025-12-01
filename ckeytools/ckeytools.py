@@ -298,6 +298,10 @@ class CkeyTools(commands.Cog):
         """
         if ctx.invoked_subcommand is not None:
             return
+        try:
+            await ctx.message.delete()
+        except discord.Forbidden:
+            pass
 
         guild_conf = self.config.guild(ctx.guild)
         image_url = await guild_conf.agetemplate_image_url()
