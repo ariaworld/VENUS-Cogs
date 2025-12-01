@@ -313,10 +313,6 @@ class CkeyTools(commands.Cog):
             timestamp=discord.utils.utcnow()
         )
         embed.set_image(url=image_url)
-        if self.bot.user:
-            embed.set_footer(text="Robot template", icon_url=self.bot.user.display_avatar.url)
-        else:
-            embed.set_footer(text="Robot template")
 
         await ctx.send(embed=embed)
 
