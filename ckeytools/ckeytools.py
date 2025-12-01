@@ -39,7 +39,9 @@ class CkeyTools(commands.Cog):
             "verified_role_id": None,
             "age_vetted_role_id": None,
             "leave_log_channel_id": None,
-            "leave_log_enabled": False
+            "leave_log_enabled": False,
+            "agetemplate_image_url": None,
+            "agetemplate_message": None
         }
         
         default_role = {
@@ -286,6 +288,84 @@ class CkeyTools(commands.Cog):
             except Exception as e:
                 log.error(f"Error changing ckey: {e}", exc_info=True)
                 return await ctx.send(f"❌ An error occurred while updating the ckey: {str(e)}")
+
+    @commands.guild_only()
+    @commands.group(name="agetemplate", invoke_without_command=True)
+    @checks.mod_or_permissions(administrator=True)
+    async def send_age_template(self, ctx: commands.Context):
+        """
+        Send the configured age template embed with the stored image and message.
+        """
+        if ctx.invoked_subcommand is not None:
+            return
+
+        guild_conf = self.config.guild(ctx.guild)
+        image_url = await guild_conf.agetemplate_image_url()
+        message = await guild_conf.agetemplate_message()
+
+        if not image_url:
+            prefix = ctx.prefix or ""
+            return await ctx.send(f"No template image set. Configure it with `{prefix}agetemplate image <url>`.")
+
+        embed = discord.Embed(
+            description=message or "Here is your template message.",
+            color=await ctx.embed_color(),
+            timestamp=discord.utils.utcnow()
+        )
+        embed.set_image(url=image_url)
+        if self.bot.user:
+            embed.set_footer(text="Robot template", icon_url=self.bot.user.display_avatar.url)
+        else:
+            embed.set_footer(text="Robot template")
+
+        await ctx.send(embed=embed)
+
+    @send_age_template.command(name="image")
+    async def set_agetemplate_image(self, ctx: commands.Context, image_url: str):
+        """
+        Set the image URL for the age template embed.
+        """
+        if not image_url.lower().startswith(("http://", "https://")):
+            return await ctx.send("Please provide a direct image link that starts with http or https.")
+
+        await self.config.guild(ctx.guild).agetemplate_image_url.set(image_url)
+        await ctx.send("Saved the template image URL.")
+
+    @send_age_template.command(name="message")
+    async def set_agetemplate_message(self, ctx: commands.Context, *, message: Optional[str] = None):
+        """
+        Set the default message for the age template embed.
+        """
+        await self.config.guild(ctx.guild).agetemplate_message.set(message)
+        await ctx.send("Saved the template message." if message else "Template message cleared (will use fallback).")
+
+    @send_age_template.command(name="show")
+    async def show_agetemplate_config(self, ctx: commands.Context):
+        """
+        Show the current template configuration.
+        """
+        guild_conf = self.config.guild(ctx.guild)
+        image_url = await guild_conf.agetemplate_image_url()
+        message = await guild_conf.agetemplate_message()
+
+        embed = discord.Embed(
+            title="Age template configuration",
+            color=await ctx.embed_color(),
+            timestamp=discord.utils.utcnow()
+        )
+        embed.add_field(name="Image URL", value=image_url or "Not set", inline=False)
+        embed.add_field(name="Message", value=chat_formatting.box(message or "Not set", "md"), inline=False)
+        await ctx.send(embed=embed)
+
+    @send_age_template.command(name="clear")
+    async def clear_agetemplate_config(self, ctx: commands.Context):
+        """
+        Clear the stored image and message for the age template embed.
+        """
+        guild_conf = self.config.guild(ctx.guild)
+        await guild_conf.agetemplate_image_url.clear()
+        await guild_conf.agetemplate_message.clear()
+        await ctx.send("Cleared the age template image and message.")
 
     #autodonator Commands
     @commands.group()
