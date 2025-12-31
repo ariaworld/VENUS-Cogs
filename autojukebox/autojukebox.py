@@ -160,10 +160,9 @@ class AutoJukebox(commands.Cog):
             return await ctx.send(f"Uh oh, message with ID {msg_id} doesn't exist.")
         
         attachment = oldmsg.attachments[0]
-        song_length = await self.config.custom("JUKEBOX_SUGGESTION", ctx.guild.id, suggestion).length()
         song_bpm = await self.config.custom("JUKEBOX_SUGGESTION", ctx.guild.id, suggestion).bpm()
         song_id = len([name for name in os.listdir(jukebox_folder)]) + 1
-        await attachment.save(os.path.join(jukebox_folder, f"{os.path.splitext(os.path.basename(attachment.filename.replace('_', ' ').replace('+', ' ')))[0]}+{song_length/100}+{song_bpm}+{song_id}.ogg"))
+        await attachment.save(os.path.join(jukebox_folder, f"{os.path.splitext(os.path.basename(attachment.filename.replace('_', ' ').replace('+', ' ')))[0]}+{song_bpm}+{song_id}.ogg"))
         
         op_data = await self.config.custom("JUKEBOX_SUGGESTION", ctx.guild.id, suggestion).author()
         op = await self.bot.fetch_user(op_data[0])
