@@ -25,34 +25,23 @@ class GameLogs(commands.Cog):
         self.config = Config.get_conf(self, identifier=908039527271104513, force_registration=True)
         self.config.register_guild(gamestaticfiles_path=None)
 
-    def _get_log_dirs(self, root_path: str):
-        candidates = [
-            os.path.join(root_path, "data", "logs"),
-        ]
-        seen = set()
-        results = []
-        for candidate in candidates:
-            if not os.path.isdir(candidate):
-                continue
-            real = os.path.realpath(candidate)
-            if real in seen:
-                continue
-            seen.add(real)
-            results.append(candidate)
-        return results
+    def _find_round_dir(self, logs_root: str, round_number: int):
+        target = f"round-{round_number}"
+        matches = []
+        for root, dirs, _ in os.walk(logs_root):
+            if target in dirs:
+                matches.append(os.path.join(root, target))
+        return matches
 
-    def _zip_logs(self, root_path: str, log_dirs, zip_path: str):
+    def _zip_round_dir(self, round_dir: str, zip_path: str):
+        round_name = os.path.basename(os.path.normpath(round_dir))
         with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
-            for log_dir in log_dirs:
-                rel_dir = os.path.relpath(log_dir, root_path)
-                if rel_dir.startswith("..") or os.path.isabs(rel_dir):
-                    rel_dir = os.path.basename(os.path.normpath(log_dir))
-                for root, _, files in os.walk(log_dir):
-                    for filename in files:
-                        file_path = os.path.join(root, filename)
-                        rel_path = os.path.relpath(file_path, log_dir)
-                        arcname = os.path.join(rel_dir, rel_path)
-                        zipf.write(file_path, arcname)
+            for root, _, files in os.walk(round_dir):
+                for filename in files:
+                    file_path = os.path.join(root, filename)
+                    rel_path = os.path.relpath(file_path, round_dir)
+                    arcname = os.path.join(round_name, rel_path)
+                    zipf.write(file_path, arcname)
 
     @commands.command(name="setgamestaticfiles")
     @commands.guild_only()
@@ -71,9 +60,9 @@ class GameLogs(commands.Cog):
     @commands.command(name="getlogs")
     @commands.guild_only()
     @checks.admin_or_permissions(administrator=True)
-    async def get_logs(self, ctx: commands.Context):
+    async def get_logs(self, ctx: commands.Context, round_number: int):
         """
-        Zip and upload logs from the configured GameStaticFiles path.
+        Zip and upload logs for a specific round from the configured GameStaticFiles path.
         """
         root_path = await self.config.guild(ctx.guild).gamestaticfiles_path()
         if not root_path:
@@ -81,9 +70,17 @@ class GameLogs(commands.Cog):
         if not os.path.isdir(root_path):
             return await ctx.send(f"Configured GameStaticFiles path does not exist: `{root_path}`")
 
-        log_dirs = self._get_log_dirs(root_path)
-        if not log_dirs:
+        logs_root = os.path.join(root_path, "data", "logs")
+        if not os.path.isdir(logs_root):
             return await ctx.send(f"No logs directory found under `{root_path}`.")
+
+        matches = self._find_round_dir(logs_root, round_number)
+        if not matches:
+            return await ctx.send(f"No folder named `round-{round_number}` found under `{logs_root}`.")
+
+        round_dir = sorted(matches, key=lambda p: os.path.getmtime(p), reverse=True)[0]
+        if len(matches) > 1:
+            await ctx.send(f"Multiple `round-{round_number}` folders found; using the most recently modified one.")
 
         temp_dir = cog_data_path(self)
         os.makedirs(temp_dir, exist_ok=True)
@@ -93,7 +90,7 @@ class GameLogs(commands.Cog):
                 temp_file = tmp.name
 
             async with ctx.typing():
-                await self.bot.loop.run_in_executor(None, self._zip_logs, root_path, log_dirs, temp_file)
+                await self.bot.loop.run_in_executor(None, self._zip_round_dir, round_dir, temp_file)
 
             zip_size = os.path.getsize(temp_file)
             size_limit = ctx.guild.filesize_limit
@@ -103,7 +100,7 @@ class GameLogs(commands.Cog):
                     f"Logs archive is too large to upload ({zip_size / 1024 / 1024:.2f} MB)."
                 )
 
-            await ctx.send(file=discord.File(temp_file, filename="logs.zip"))
+            await ctx.send(file=discord.File(temp_file, filename=f"round-{round_number}-logs.zip"))
         finally:
             if temp_file and os.path.exists(temp_file):
                 os.remove(temp_file)
