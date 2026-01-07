@@ -1,0 +1,15 @@
+{
+    "author": [
+        "Goku"
+    ],
+    "description": "Admin-only command to zip and post SS13 logs from a configured GameStaticFiles path.",
+    "install_msg": "Thanks for installing GameLogs. Use `[p]setgamestaticfiles <path>` to configure the log root, then `[p]getlogs`.",
+    "short": "GameStaticFiles log upload",
+    "Name": "GameLogs",
+    "tags": [
+        "Utility",
+        "Logs",
+        "Admin"
+    ],
+    "min_bot_version": "3.5.0"
+}
