@@ -1,0 +1,15 @@
+{
+    "author": [
+        "Goku"
+    ],
+    "description": "DM users when their feedback status changes.",
+    "install_msg": "Thanks for installing Feedback. Use `[p]feedback <text> @user <status>` to DM a status update.",
+    "short": "Feedback status DMs",
+    "Name": "Feedback",
+    "tags": [
+        "Utility",
+        "Feedback",
+        "Mod"
+    ],
+    "min_bot_version": "3.5.0"
+}
